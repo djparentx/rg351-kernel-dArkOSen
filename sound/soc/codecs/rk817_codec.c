@@ -58,6 +58,66 @@ module_param_named(dbg_level, dbg_enable, int, 0644);
 #define RK817_DAC_VOLUME \
 	SOC_DOUBLE_R("Playback Volume", RK817_CODEC_DDAC_VOLL, RK817_CODEC_DDAC_VOLR, 0, 0xff, 1)
 static const DECLARE_TLV_DB_MINMAX(rk817_vol_tlv, -9500, -675);
+static const unsigned char rk817_volume_curve[238] = {
+	255,251,248,245,243,241,239,237,235,234,232,230,229,227,225,224,
+	222,221,219,218,216,215,214,212,211,210,208,207,206,204,203,202,
+	201,199,198,197,196,194,193,192,191,190,189,187,186,185,184,183,
+	182,181,179,178,177,176,175,174,173,172,171,170,169,168,166,165,
+	164,163,162,161,160,159,158,157,156,155,154,153,152,151,150,149,
+	148,147,146,145,144,143,142,141,141,140,139,138,137,136,135,134,
+	133,132,131,130,129,128,127,126,126,125,124,123,122,121,120,119,
+	118,117,117,116,115,114,113,112,111,110,109,109,108,107,106,105,
+	104,103,103,102,101,100,99,98,97,97,96,95,94,93,92,91,
+	91,90,89,88,87,86,86,85,84,83,82,82,81,80,79,78,
+	77,77,76,75,74,73,73,72,71,70,69,69,68,67,66,65,
+	65,64,63,62,61,61,60,59,58,57,57,56,55,54,54,53,
+	52,51,50,50,49,48,47,47,46,45,44,43,43,42,41,40,
+	40,39,38,37,37,36,35,34,34,33,32,31,31,30,29,28,
+	28,27,26,25,25,24,23,22,22,21,20,19,19,18
+};
+
+static int rk817_vol_info(struct snd_kcontrol *kcontrol,
+			  struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 2;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 237;
+	return 0;
+}
+
+static int rk817_vol_get(struct snd_kcontrol *kcontrol,
+			 struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	unsigned int reg;
+	int i;
+
+	reg = snd_soc_read(codec, RK817_CODEC_DDAC_VOLL);
+	for (i = 0; i < 237; i++) {
+		if (rk817_volume_curve[i] >= reg && rk817_volume_curve[i + 1] <= reg)
+			break;
+	}
+	ucontrol->value.integer.value[0] = i;
+	ucontrol->value.integer.value[1] = i;
+	return 0;
+}
+
+static int rk817_vol_put(struct snd_kcontrol *kcontrol,
+			 struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	int val = ucontrol->value.integer.value[0];
+
+	if (val < 0)
+		val = 0;
+	if (val > 237)
+		val = 237;
+
+	snd_soc_write(codec, RK817_CODEC_DDAC_VOLL, rk817_volume_curve[val]);
+	snd_soc_write(codec, RK817_CODEC_DDAC_VOLR, rk817_volume_curve[val]);
+	return 0;
+}
 #endif
 
 /*
@@ -167,8 +227,13 @@ static const struct reg_default rk817_reg_defaults[] = {
 
 #ifdef CONFIG_ARCH_ROCKCHIP_ODROIDGOA
 static const struct snd_kcontrol_new rk817_dac_controls[] = {
-	SOC_DOUBLE_R_RANGE_TLV("Playback Volume", RK817_CODEC_DDAC_VOLL,
-		RK817_CODEC_DDAC_VOLR, 0, 0x12, 0xff, 1, rk817_vol_tlv),
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name  = "Playback Volume",
+		.info  = rk817_vol_info,
+		.get   = rk817_vol_get,
+		.put   = rk817_vol_put,
+	},
 	RK817_ADC_VOLUME
 };
 #endif
