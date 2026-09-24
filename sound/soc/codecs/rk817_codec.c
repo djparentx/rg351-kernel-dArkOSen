@@ -249,6 +249,7 @@ static const struct reg_default rk817_reg_defaults[] = {
 static const struct snd_kcontrol_new rk817_dac_controls[] = {
 	SOC_SINGLE_EXT("Playback Volume", 0, 0, 237, 0,
 		       rk817_vol_get, rk817_vol_put),
+	RK817_ADC_VOLUME
 };
 #endif
 
