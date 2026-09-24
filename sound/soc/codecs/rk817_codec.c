@@ -233,7 +233,7 @@ static const struct reg_default rk817_reg_defaults[] = {
 
 #ifdef CONFIG_ARCH_ROCKCHIP_ODROIDGOA
 static const struct snd_kcontrol_new rk817_dac_controls[] = {
-	SOC_SINGLE_EXT("Playback Volume", 0, 0, 237, 0,
+	SOC_SINGLE_EXT("Playback", 0, 0, 237, 0,
 		       darkosen_playback_vol_get, darkosen_playback_vol_put),
 	RK817_ADC_VOLUME
 };
