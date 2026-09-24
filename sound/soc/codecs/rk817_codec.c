@@ -93,14 +93,14 @@ static int darkosen_playback_vol_get(struct snd_kcontrol *kcontrol,
 	ucontrol->value.integer.value[0] = 0;
 	ucontrol->value.integer.value[1] = 0;
 
-	for (i = 237; i >= 0; i--) {
-		if (darkosen_vol_curve_tbl[i] >= reg_l) {
+	for (i = 0; i < 238; i++) {
+		if (darkosen_vol_curve_tbl[i] <= reg_l) {
 			ucontrol->value.integer.value[0] = i;
 			break;
 		}
 	}
-	for (i = 237; i >= 0; i--) {
-		if (darkosen_vol_curve_tbl[i] >= reg_r) {
+	for (i = 0; i < 238; i++) {
+		if (darkosen_vol_curve_tbl[i] <= reg_r) {
 			ucontrol->value.integer.value[1] = i;
 			break;
 		}
