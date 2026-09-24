@@ -120,14 +120,19 @@ static int darkosen_playback_vol_put(struct snd_kcontrol *kcontrol,
 	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	unsigned int pos_l = ucontrol->value.integer.value[0];
 	unsigned int pos_r = ucontrol->value.integer.value[1];
+	unsigned int old_l, old_r;
 
 	if (pos_l > 237 || pos_r > 237)
 		return -EINVAL;
 
+	old_l = snd_soc_read(codec, RK817_CODEC_DDAC_VOLL);
+	old_r = snd_soc_read(codec, RK817_CODEC_DDAC_VOLR);
+
 	snd_soc_write(codec, RK817_CODEC_DDAC_VOLL, darkosen_vol_curve_tbl[pos_l]);
 	snd_soc_write(codec, RK817_CODEC_DDAC_VOLR, darkosen_vol_curve_tbl[pos_r]);
 
-	return 0;
+	return (darkosen_vol_curve_tbl[pos_l] != old_l ||
+		darkosen_vol_curve_tbl[pos_r] != old_r) ? 1 : 0;
 }
 #endif
 
