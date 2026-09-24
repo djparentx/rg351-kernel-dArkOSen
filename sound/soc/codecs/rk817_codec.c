@@ -58,7 +58,7 @@ module_param_named(dbg_level, dbg_enable, int, 0644);
 #define RK817_DAC_VOLUME \
 	SOC_DOUBLE_R("Playback Volume", RK817_CODEC_DDAC_VOLL, RK817_CODEC_DDAC_VOLR, 0, 0xff, 1)
 static const DECLARE_TLV_DB_MINMAX(rk817_vol_tlv, -9500, -675);
-static const u8 darkosen_vol_curve_tbl[238] = {
+static const unsigned char rk817_volume_curve[238] = {
 	0xff, 0xfb, 0xf8, 0xf5, 0xf3, 0xf1, 0xef, 0xed, 0xeb, 0xea, 0xe8, 0xe6, 0xe5, 0xe3, 0xe1, 0xe0,
 	0xde, 0xdd, 0xdb, 0xda, 0xd8, 0xd7, 0xd6, 0xd4, 0xd3, 0xd2, 0xd0, 0xcf, 0xce, 0xcc, 0xcb, 0xca,
 	0xc9, 0xc7, 0xc6, 0xc5, 0xc4, 0xc2, 0xc1, 0xc0, 0xbf, 0xbe, 0xbd, 0xbb, 0xba, 0xb9, 0xb8, 0xb7,
@@ -76,46 +76,66 @@ static const u8 darkosen_vol_curve_tbl[238] = {
 	0x1c, 0x1b, 0x1a, 0x19, 0x19, 0x18, 0x17, 0x16, 0x16, 0x15, 0x14, 0x13, 0x13, 0x12
 };
 
-static int darkosen_playback_vol_get(struct snd_kcontrol *kcontrol,
-				      struct snd_ctl_elem_value *ucontrol)
+static int rk817_vol_info(struct snd_kcontrol *kcontrol,
+			  struct snd_ctl_elem_info *uinfo)
 {
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
-	unsigned int reg_l = snd_soc_read(codec, RK817_CODEC_DDAC_VOLL);
-	unsigned int reg_r = snd_soc_read(codec, RK817_CODEC_DDAC_VOLR);
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 2;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 237;
+	return 0;
+}
+
+static int rk817_vol_get(struct snd_kcontrol *kcontrol,
+			 struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	unsigned int regl, regr;
 	int i;
 
-	ucontrol->value.integer.value[0] = 0;
-	ucontrol->value.integer.value[1] = 0;
+	regl = snd_soc_read(codec, RK817_CODEC_DDAC_VOLL);
+	regr = snd_soc_read(codec, RK817_CODEC_DDAC_VOLR);
 
-	for (i = 237; i >= 0; i--) {
-		if (darkosen_vol_curve_tbl[i] >= reg_l) {
-			ucontrol->value.integer.value[0] = i;
-			break;
+	/* reverse-map register value to ALSA index (curve is non-increasing) */
+	if (regl >= rk817_volume_curve[0])
+		i = 0;
+	else if (regl <= rk817_volume_curve[237])
+		i = 237;
+	else {
+		for (i = 0; i < 238; i++) {
+			if (rk817_volume_curve[i] <= regl)
+				break;
 		}
 	}
-	for (i = 237; i >= 0; i--) {
-		if (darkosen_vol_curve_tbl[i] >= reg_r) {
-			ucontrol->value.integer.value[1] = i;
-			break;
+	ucontrol->value.integer.value[0] = i;
+
+	if (regr >= rk817_volume_curve[0])
+		i = 0;
+	else if (regr <= rk817_volume_curve[237])
+		i = 237;
+	else {
+		for (i = 0; i < 238; i++) {
+			if (rk817_volume_curve[i] <= regr)
+				break;
 		}
 	}
+	ucontrol->value.integer.value[1] = i;
 
 	return 0;
 }
 
-static int darkosen_playback_vol_put(struct snd_kcontrol *kcontrol,
-				      struct snd_ctl_elem_value *ucontrol)
+static int rk817_vol_put(struct snd_kcontrol *kcontrol,
+			 struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
-	unsigned int pos_l = ucontrol->value.integer.value[0];
-	unsigned int pos_r = ucontrol->value.integer.value[1];
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	int l = ucontrol->value.integer.value[0];
+	int r = ucontrol->value.integer.value[1];
 
-	if (pos_l > 237 || pos_r > 237)
-		return -EINVAL;
+	l = clamp(l, 0, 237);
+	r = clamp(r, 0, 237);
 
-	snd_soc_write(codec, RK817_CODEC_DDAC_VOLL, darkosen_vol_curve_tbl[pos_l]);
-	snd_soc_write(codec, RK817_CODEC_DDAC_VOLR, darkosen_vol_curve_tbl[pos_r]);
-
+	snd_soc_write(codec, RK817_CODEC_DDAC_VOLL, rk817_volume_curve[l]);
+	snd_soc_write(codec, RK817_CODEC_DDAC_VOLR, rk817_volume_curve[r]);
 	return 0;
 }
 #endif
@@ -227,10 +247,8 @@ static const struct reg_default rk817_reg_defaults[] = {
 
 #ifdef CONFIG_ARCH_ROCKCHIP_ODROIDGOA
 static const struct snd_kcontrol_new rk817_dac_controls[] = {
-	SOC_DOUBLE_EXT_TLV("Playback Volume", 0, 0, 1, 237, 0,
-		darkosen_playback_vol_get, darkosen_playback_vol_put,
-		rk817_vol_tlv),
-	RK817_ADC_VOLUME
+	SOC_SINGLE_EXT("Playback Volume", 0, 0, 237, 0,
+		       rk817_vol_get, rk817_vol_put),
 };
 #endif
 
