@@ -125,10 +125,6 @@ static int darkosen_playback_vol_put(struct snd_kcontrol *kcontrol,
 	if (pos_l > 237 || pos_r > 237)
 		return -EINVAL;
 
-	/* mono control: mirror left to right */
-	if (pos_r == 0)
-		pos_r = pos_l;
-
 	old_l = snd_soc_read(codec, RK817_CODEC_DDAC_VOLL);
 	old_r = snd_soc_read(codec, RK817_CODEC_DDAC_VOLR);
 
@@ -247,7 +243,7 @@ static const struct reg_default rk817_reg_defaults[] = {
 
 #ifdef CONFIG_ARCH_ROCKCHIP_ODROIDGOA
 static const struct snd_kcontrol_new rk817_dac_controls[] = {
-	SOC_SINGLE_EXT("Playback Volume", 0, 0, 237, 0,
+	SOC_DOUBLE_EXT("Playback Volume", 0, 0, 1, 237, 0,
 		       darkosen_playback_vol_get, darkosen_playback_vol_put),
 	RK817_ADC_VOLUME
 };
