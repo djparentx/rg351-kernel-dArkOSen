@@ -90,16 +90,37 @@ static int rk817_vol_get(struct snd_kcontrol *kcontrol,
 			 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-	unsigned int reg;
+	unsigned int regl, regr;
 	int i;
 
-	reg = snd_soc_read(codec, RK817_CODEC_DDAC_VOLL);
-	for (i = 0; i < 237; i++) {
-		if (rk817_volume_curve[i] >= reg && rk817_volume_curve[i + 1] <= reg)
-			break;
+	regl = snd_soc_read(codec, RK817_CODEC_DDAC_VOLL);
+	regr = snd_soc_read(codec, RK817_CODEC_DDAC_VOLR);
+
+	/* reverse-map register value to ALSA index (curve is non-increasing) */
+	if (regl >= rk817_volume_curve[0])
+		i = 0;
+	else if (regl <= rk817_volume_curve[237])
+		i = 237;
+	else {
+		for (i = 0; i < 238; i++) {
+			if (rk817_volume_curve[i] <= regl)
+				break;
+		}
 	}
 	ucontrol->value.integer.value[0] = i;
+
+	if (regr >= rk817_volume_curve[0])
+		i = 0;
+	else if (regr <= rk817_volume_curve[237])
+		i = 237;
+	else {
+		for (i = 0; i < 238; i++) {
+			if (rk817_volume_curve[i] <= regr)
+				break;
+		}
+	}
 	ucontrol->value.integer.value[1] = i;
+
 	return 0;
 }
 
@@ -107,15 +128,14 @@ static int rk817_vol_put(struct snd_kcontrol *kcontrol,
 			 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
-	int val = ucontrol->value.integer.value[0];
+	int l = ucontrol->value.integer.value[0];
+	int r = ucontrol->value.integer.value[1];
 
-	if (val < 0)
-		val = 0;
-	if (val > 237)
-		val = 237;
+	l = clamp(l, 0, 237);
+	r = clamp(r, 0, 237);
 
-	snd_soc_write(codec, RK817_CODEC_DDAC_VOLL, rk817_volume_curve[val]);
-	snd_soc_write(codec, RK817_CODEC_DDAC_VOLR, rk817_volume_curve[val]);
+	snd_soc_write(codec, RK817_CODEC_DDAC_VOLL, rk817_volume_curve[l]);
+	snd_soc_write(codec, RK817_CODEC_DDAC_VOLR, rk817_volume_curve[r]);
 	return 0;
 }
 #endif
@@ -228,11 +248,12 @@ static const struct reg_default rk817_reg_defaults[] = {
 #ifdef CONFIG_ARCH_ROCKCHIP_ODROIDGOA
 static const struct snd_kcontrol_new rk817_dac_controls[] = {
 	{
-		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
-		.name  = "Playback Volume",
-		.info  = rk817_vol_info,
-		.get   = rk817_vol_get,
-		.put   = rk817_vol_put,
+		.iface  = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.access = SNDRV_CTL_ELEM_ACCESS_READWRITE,
+		.name   = "Playback Volume",
+		.info   = rk817_vol_info,
+		.get    = rk817_vol_get,
+		.put    = rk817_vol_put,
 	},
 	RK817_ADC_VOLUME
 };
