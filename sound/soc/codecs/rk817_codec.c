@@ -125,6 +125,10 @@ static int darkosen_playback_vol_put(struct snd_kcontrol *kcontrol,
 	if (pos_l > 237 || pos_r > 237)
 		return -EINVAL;
 
+	/* mono control: mirror left to right */
+	if (pos_r == 0)
+		pos_r = pos_l;
+
 	old_l = snd_soc_read(codec, RK817_CODEC_DDAC_VOLL);
 	old_r = snd_soc_read(codec, RK817_CODEC_DDAC_VOLR);
 
