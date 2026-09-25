@@ -57,7 +57,6 @@ module_param_named(dbg_level, dbg_enable, int, 0644);
 #ifdef CONFIG_ARCH_ROCKCHIP_ODROIDGOA
 #define RK817_DAC_VOLUME \
 	SOC_DOUBLE_R("Playback Volume", RK817_CODEC_DDAC_VOLL, RK817_CODEC_DDAC_VOLR, 0, 0xff, 1)
-static const DECLARE_TLV_DB_MINMAX(rk817_vol_tlv, -9500, -675);
 /*
  * dArkOSen custom playback volume curve.
  * Maps UI position 0-237 to DDAC_VOL register 0x12 (loudest,
