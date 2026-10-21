@@ -142,15 +142,13 @@ static void Hal_EfuseParseBTCoexistInfo(PADAPTER adapter, u8 *map, u8 mapvalid)
 	u32 tmpu4;
 	u32 tmp_u32;
 
-	if ((mapvalid == _TRUE) && (map[EEPROM_RF_BOARD_OPTION_8821C] != 0xFF)) {
+	tmp_u32 = rtw_read32(adapter, REG_WL_BT_PWR_CTRL_8821C);
 
-		tmp_u32 = rtw_read32(adapter, REG_WL_BT_PWR_CTRL_8821C);
-		/* 0xc1[7:5] = 0x01 */
-		if ((((map[EEPROM_RF_BOARD_OPTION_8821C] & 0xe0) >> 5) == 0x01) && (tmp_u32 & BIT_BT_FUNC_EN_8821C))
-			hal->EEPROMBluetoothCoexist = _TRUE;
-		else
-			hal->EEPROMBluetoothCoexist = _FALSE;
-	} else
+	/* dArkOSen: enable BT-coex whenever the BT function is powered,
+	 * regardless of efuse 0xC1[7:5]. WiFi-only parts have BT_FUNC_EN clear. */
+	if (tmp_u32 & BIT_BT_FUNC_EN_8821C)
+		hal->EEPROMBluetoothCoexist = _TRUE;
+	else
 		hal->EEPROMBluetoothCoexist = _FALSE;
 
 	hal->EEPROMBluetoothType = BT_RTL8821C;
@@ -172,9 +170,11 @@ static void Hal_EfuseParseBTCoexistInfo(PADAPTER adapter, u8 *map, u8 mapvalid)
 	}
 
 exit:
-	RTW_INFO("EEPROM %s BT-coex, ant_num=%d\n",
-		 hal->EEPROMBluetoothCoexist == _TRUE ? "Enable" : "Disable",
-		 hal->EEPROMBluetoothAntNum == Ant_x2 ? 2 : 1);
+	RTW_PRINT("EEPROM %s BT-coex, ant_num=%d (BT_FUNC_EN=%d efuse_0xC1=0x%02x mapvalid=%d)\n",
+		  hal->EEPROMBluetoothCoexist == _TRUE ? "Enable" : "Disable",
+		  hal->EEPROMBluetoothAntNum == Ant_x2 ? 2 : 1,
+		  (tmp_u32 & BIT_BT_FUNC_EN_8821C) ? 1 : 0,
+		  map[EEPROM_RF_BOARD_OPTION_8821C], mapvalid);
 }
 
 static void Hal_EfuseParseChnlPlan(PADAPTER adapter, u8 *map, u8 autoloadfail)
@@ -531,8 +531,11 @@ u8 rtl8821c_read_efuse(PADAPTER adapter)
 		goto exit;
 	{
 		struct hal_spec_t *hal_spec = GET_HAL_SPEC(adapter);
+		u32 bt_pwr = rtw_read32(adapter, REG_WL_BT_PWR_CTRL_8821C);
 
-		if (hal_spec->hci_type <= 3 && hal_spec->hci_type >= 1) {
+		/* dArkOSen: hci_type may only disable BT-coex when BT is not powered */
+		if (hal_spec->hci_type <= 3 && hal_spec->hci_type >= 1
+		    && !(bt_pwr & BIT_BT_FUNC_EN_8821C)) {
 			hal->EEPROMBluetoothCoexist = _FALSE;
 			RTW_INFO("EEPROM Disable BT-coex by hal_spec\n");
 			rtw_btcoex_wifionly_AntInfoSetting(adapter);
